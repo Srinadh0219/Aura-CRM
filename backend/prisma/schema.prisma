@@ -1,0 +1,93 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         String   @default("MEMBER")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdRecords Record[] @relation("RecordCreatedBy")
+  updatedRecords Record[] @relation("RecordUpdatedBy")
+
+  @@map("users")
+}
+
+model Namespace {
+  id          String   @id @default(uuid())
+  name        String
+  handle      String   @unique
+  description String?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  modules Module[]
+
+  @@map("namespaces")
+}
+
+model Module {
+  id          String   @id @default(uuid())
+  namespaceId String
+  namespace   Namespace @relation(fields: [namespaceId], references: [id], onDelete: Cascade)
+  name        String
+  handle      String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  fields  ModuleField[]
+  records Record[]
+
+  @@unique([namespaceId, handle])
+  @@map("modules")
+}
+
+model ModuleField {
+  id         String   @id @default(uuid())
+  moduleId   String
+  module     Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  name       String
+  label      String
+  kind       String   @default("String")
+  isRequired Boolean  @default(false)
+  isMulti    Boolean  @default(false)
+  options    String?  // Stores JSON string for dropdown select values or relations
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([moduleId, name])
+  @@map("module_fields")
+}
+
+model Record {
+  id          String    @id @default(uuid())
+  moduleId    String
+  module      Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  values      String    // Dynamic field key-value pairs stored as JSON string
+  
+  createdById String?
+  createdBy   User?     @relation("RecordCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById String?
+  updatedBy   User?     @relation("RecordUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([moduleId])
+  @@map("records")
+}

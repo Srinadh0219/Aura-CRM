@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+*/.env
+*/.env.local
+
+# Build outputs
+dist/
+build/
+*/dist/
+*/build/
+
+# SQLite Database files
+*.db
+*.db-journal
+backend/prisma/*.db
+
+# Logs & Debugging
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Operating System & IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

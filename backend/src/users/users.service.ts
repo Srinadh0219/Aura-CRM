@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RoleType } from '../common/enums';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async findAll() {
     return this.prisma.user.findMany({
@@ -38,21 +42,52 @@ export class UsersService {
     return user;
   }
 
-  async updateRole(id: string, role: RoleType) {
-    await this.findOne(id);
-    return this.prisma.user.update({
+  async updateRole(id: string, role: RoleType, currentUser?: any) {
+    const targetUser = await this.findOne(id);
+    const updated = await this.prisma.user.update({
       where: { id },
       data: { role: role.toString() },
       select: { id: true, email: true, role: true },
     });
+
+    await this.auditService.log({
+      userId: currentUser?.id,
+      userName: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Superadmin',
+      userEmail: currentUser?.email || 'admin@auracrm.local',
+      action: 'UPDATE_ROLE',
+      entityType: 'USER',
+      entityId: id,
+      details: {
+        targetUserEmail: targetUser.email,
+        oldRole: targetUser.role,
+        newRole: role.toString(),
+      },
+    });
+
+    return updated;
   }
 
-  async toggleActive(id: string, isActive: boolean) {
-    await this.findOne(id);
-    return this.prisma.user.update({
+  async toggleActive(id: string, isActive: boolean, currentUser?: any) {
+    const targetUser = await this.findOne(id);
+    const updated = await this.prisma.user.update({
       where: { id },
       data: { isActive },
       select: { id: true, email: true, isActive: true },
     });
+
+    await this.auditService.log({
+      userId: currentUser?.id,
+      userName: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Superadmin',
+      userEmail: currentUser?.email || 'admin@auracrm.local',
+      action: isActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER',
+      entityType: 'USER',
+      entityId: id,
+      details: {
+        targetUserEmail: targetUser.email,
+        status: isActive ? 'Active' : 'Inactive',
+      },
+    });
+
+    return updated;
   }
 }

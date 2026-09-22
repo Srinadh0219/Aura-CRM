@@ -96,3 +96,74 @@ Featuring a futuristic **3D animated interface**, strict **Role-Based Access Con
 ```bash
 git clone https://github.com/Srinadh0219/Aura-CRM.git
 cd Aura-CRM
+```
+
+---
+
+### 2. Backend Setup
+```bash
+cd backend
+
+# Install dependencies
+npm install
+
+# Setup Prisma Database
+npx prisma generate
+npx prisma db push
+
+# Start NestJS backend server
+npm run start:dev
+```
+> 🚀 **Backend runs at**: `http://localhost:3000/api`  
+> 📚 **Swagger Docs at**: `http://localhost:3000/api/docs`
+
+---
+
+### 3. Frontend Setup
+Open a new terminal window:
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start Vite development server
+npm run dev
+```
+> 🌐 **Frontend runs at**: `http://localhost:5173/`
+
+---
+
+## 📚 API Documentation
+
+Once the backend is running, explore the interactive **Swagger REST API Docs** at:
+👉 **`http://localhost:3000/api/docs`**
+
+### Core API Endpoints:
+- `POST /api/auth/register` — Register a new account *(First user automatically becomes SUPERADMIN)*.
+- `POST /api/auth/login` — Sign in and receive JWT token.
+- `GET /api/auth/profile` — Fetch current user details.
+- `PATCH /api/auth/profile` — Update user name.
+- `POST /api/auth/change-password` — Secure password update.
+- `GET /api/users` — Superadmin user list & RBAC management.
+- `PATCH /api/users/:id/role` — Update user role tier.
+- `GET /api/compose/namespaces` — List all dynamic applications.
+- `POST /api/compose/namespaces` — Create new application namespace.
+- `GET /api/compose/namespaces/:id/modules` — List modules in namespace.
+- `POST /api/compose/modules/:id/records` — Create dynamic JSONB CRM record.
+
+---
+
+## 👨‍💻 Author
+
+**SRINADH THATIKRINDHI**
+
+- 🐙 **GitHub**: [@Srinadh0219](https://github.com/Srinadh0219)
+- 💼 **LinkedIn**: [Srinadh Thatikrindhi](https://www.linkedin.com/in/srinadh-thatikrindhi-b0b844323/)
+- ✉️ **Email**: [srinadhthatikrindhi@gmail.com](mailto:srinadhthatikrindhi@gmail.com)
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — feel free to use and customize for your own applications!

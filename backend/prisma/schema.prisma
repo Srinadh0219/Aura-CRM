@@ -20,6 +20,7 @@ model User {
 
   createdRecords Record[] @relation("RecordCreatedBy")
   updatedRecords Record[] @relation("RecordUpdatedBy")
+  auditLogs      AuditLog[]
 
   @@map("users")
 }
@@ -48,8 +49,9 @@ model Module {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  fields  ModuleField[]
-  records Record[]
+  fields          ModuleField[]
+  records         Record[]
+  automationRules AutomationRule[]
 
   @@unique([namespaceId, handle])
   @@map("modules")
@@ -90,4 +92,40 @@ model Record {
 
   @@index([moduleId])
   @@map("records")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName   String
+  userEmail  String
+  action     String   // e.g., 'CREATE_RECORD', 'UPDATE_RECORD', 'DELETE_RECORD', 'UPDATE_ROLE', 'LOGIN'
+  entityType String   // e.g., 'RECORD', 'MODULE', 'NAMESPACE', 'USER'
+  entityId   String
+  details    String?  // JSON string of before/after or metadata
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model AutomationRule {
+  id                String   @id @default(uuid())
+  moduleId          String
+  module            Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  name              String
+  triggerEvent      String   // 'RECORD_CREATED', 'RECORD_UPDATED'
+  conditionField    String?  // field name e.g. 'status'
+  conditionOperator String?  // 'EQUALS', 'NOT_EQUALS', 'CONTAINS'
+  conditionValue    String?  // e.g. 'Won'
+  actionType        String   // 'SET_FIELD', 'NOTIFY', 'LOG_EVENT'
+  actionPayload     String   // JSON string with parameters e.g. { "targetField": "priority", "value": "High" }
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([moduleId])
+  @@map("automation_rules")
 }

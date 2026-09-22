@@ -17,9 +17,19 @@ export class RecordsController {
   async create(
     @Param('moduleId') moduleId: string,
     @Body() dto: CreateRecordDto,
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: any,
   ) {
-    return this.recordsService.create(moduleId, dto, userId);
+    return this.recordsService.create(moduleId, dto, user);
+  }
+
+  @Post('bulk')
+  @ApiOperation({ summary: 'Bulk import records from CSV/JSON' })
+  async bulkCreate(
+    @Param('moduleId') moduleId: string,
+    @Body() body: { items: Array<Record<string, any>> },
+    @CurrentUser() user: any,
+  ) {
+    return this.recordsService.bulkCreate(moduleId, body.items || [], user);
   }
 
   @Get()
@@ -46,9 +56,9 @@ export class RecordsController {
     @Param('moduleId') moduleId: string,
     @Param('recordId') recordId: string,
     @Body() dto: UpdateRecordDto,
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: any,
   ) {
-    return this.recordsService.update(moduleId, recordId, dto, userId);
+    return this.recordsService.update(moduleId, recordId, dto, user);
   }
 
   @Delete(':recordId')
@@ -56,7 +66,8 @@ export class RecordsController {
   async remove(
     @Param('moduleId') moduleId: string,
     @Param('recordId') recordId: string,
+    @CurrentUser() user: any,
   ) {
-    return this.recordsService.remove(moduleId, recordId);
+    return this.recordsService.remove(moduleId, recordId, user);
   }
 }

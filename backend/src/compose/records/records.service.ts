@@ -2,26 +2,40 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateRecordDto, QueryRecordDto, UpdateRecordDto } from './dto/record.dto';
 import { FieldKind } from '../../common/enums';
+import { AuditService } from '../../audit/audit.service';
+import { AutomationService } from '../../automation/automation.service';
 
 @Injectable()
 export class RecordsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+    private readonly automationService: AutomationService,
+  ) {}
 
-  async create(moduleId: string, dto: CreateRecordDto, userId?: string) {
+  async create(moduleId: string, dto: CreateRecordDto, user?: any) {
     const mod = await this.prisma.module.findUnique({
       where: { id: moduleId },
       include: { fields: true },
     });
     if (!mod) throw new NotFoundException(`Module ${moduleId} not found`);
 
-    const sanitizedValues = this.validateAndSanitize(mod.fields, dto.values);
+    let sanitizedValues = this.validateAndSanitize(mod.fields, dto.values);
+
+    // Evaluate Automation Triggers on creation
+    sanitizedValues = await this.automationService.evaluateRules(
+      'RECORD_CREATED',
+      moduleId,
+      sanitizedValues,
+      user,
+    );
 
     const record = await this.prisma.record.create({
       data: {
         moduleId,
         values: JSON.stringify(sanitizedValues),
-        createdById: userId,
-        updatedById: userId,
+        createdById: user?.id,
+        updatedById: user?.id,
       },
       include: {
         createdBy: {
@@ -30,7 +44,79 @@ export class RecordsService {
       },
     });
 
+    // Write Audit Log
+    await this.auditService.log({
+      userId: user?.id,
+      userName: user ? `${user.firstName} ${user.lastName}` : 'System',
+      userEmail: user?.email || 'system@auracrm.local',
+      action: 'CREATE_RECORD',
+      entityType: 'RECORD',
+      entityId: record.id,
+      details: {
+        moduleName: mod.name,
+        moduleHandle: mod.handle,
+        createdValues: sanitizedValues,
+      },
+    });
+
     return this.formatRecord(record);
+  }
+
+  async bulkCreate(moduleId: string, items: Array<Record<string, any>>, user?: any) {
+    const mod = await this.prisma.module.findUnique({
+      where: { id: moduleId },
+      include: { fields: true },
+    });
+    if (!mod) throw new NotFoundException(`Module ${moduleId} not found`);
+
+    const createdRecords = [];
+    let successCount = 0;
+
+    for (const rawValues of items) {
+      try {
+        let sanitized = this.validateAndSanitize(mod.fields, rawValues);
+        sanitized = await this.automationService.evaluateRules(
+          'RECORD_CREATED',
+          moduleId,
+          sanitized,
+          user,
+        );
+
+        const record = await this.prisma.record.create({
+          data: {
+            moduleId,
+            values: JSON.stringify(sanitized),
+            createdById: user?.id,
+            updatedById: user?.id,
+          },
+        });
+        createdRecords.push(record);
+        successCount++;
+      } catch (err) {
+        console.warn('Skipping invalid bulk record:', err);
+      }
+    }
+
+    // Write Audit Log for bulk import
+    await this.auditService.log({
+      userId: user?.id,
+      userName: user ? `${user.firstName} ${user.lastName}` : 'System',
+      userEmail: user?.email || 'system@auracrm.local',
+      action: 'BULK_IMPORT_CSV',
+      entityType: 'MODULE',
+      entityId: moduleId,
+      details: {
+        moduleName: mod.name,
+        importedCount: successCount,
+        totalAttempted: items.length,
+      },
+    });
+
+    return {
+      message: `Successfully imported ${successCount} records into ${mod.name}`,
+      imported: successCount,
+      total: items.length,
+    };
   }
 
   async findAll(moduleId: string, queryDto: QueryRecordDto) {
@@ -126,19 +212,35 @@ export class RecordsService {
     return this.formatRecord(record);
   }
 
-  async update(moduleId: string, recordId: string, dto: UpdateRecordDto, userId?: string) {
+  async update(moduleId: string, recordId: string, dto: UpdateRecordDto, user?: any) {
     const record = await this.findOne(moduleId, recordId);
     const mod = record.module;
 
     const currentValues = (record.values as Record<string, any>) || {};
-    const mergedValues = { ...currentValues, ...dto.values };
-    const sanitizedValues = this.validateAndSanitize(mod.fields, mergedValues);
+    let mergedValues = { ...currentValues, ...dto.values };
+    let sanitizedValues = this.validateAndSanitize(mod.fields, mergedValues);
+
+    // Evaluate Automation Triggers on update
+    sanitizedValues = await this.automationService.evaluateRules(
+      'RECORD_UPDATED',
+      moduleId,
+      sanitizedValues,
+      user,
+    );
+
+    // Calculate diff between before and after
+    const diff: Record<string, { from: any; to: any }> = {};
+    for (const key of Object.keys(sanitizedValues)) {
+      if (currentValues[key] !== sanitizedValues[key]) {
+        diff[key] = { from: currentValues[key] || null, to: sanitizedValues[key] };
+      }
+    }
 
     const updated = await this.prisma.record.update({
       where: { id: recordId },
       data: {
         values: JSON.stringify(sanitizedValues),
-        updatedById: userId,
+        updatedById: user?.id,
       },
       include: {
         updatedBy: {
@@ -147,15 +249,45 @@ export class RecordsService {
       },
     });
 
+    // Write Audit Log
+    if (Object.keys(diff).length > 0) {
+      await this.auditService.log({
+        userId: user?.id,
+        userName: user ? `${user.firstName} ${user.lastName}` : 'System',
+        userEmail: user?.email || 'system@auracrm.local',
+        action: 'UPDATE_RECORD',
+        entityType: 'RECORD',
+        entityId: recordId,
+        details: {
+          moduleName: mod.name,
+          diff,
+        },
+      });
+    }
+
     return this.formatRecord(updated);
   }
 
-  async remove(moduleId: string, recordId: string) {
-    await this.findOne(moduleId, recordId);
-    return this.prisma.record.update({
+  async remove(moduleId: string, recordId: string, user?: any) {
+    const record = await this.findOne(moduleId, recordId);
+    const updated = await this.prisma.record.update({
       where: { id: recordId },
       data: { deletedAt: new Date() },
     });
+
+    await this.auditService.log({
+      userId: user?.id,
+      userName: user ? `${user.firstName} ${user.lastName}` : 'System',
+      userEmail: user?.email || 'system@auracrm.local',
+      action: 'DELETE_RECORD',
+      entityType: 'RECORD',
+      entityId: recordId,
+      details: {
+        moduleName: record.module.name,
+      },
+    });
+
+    return updated;
   }
 
   private formatRecord(r: any) {

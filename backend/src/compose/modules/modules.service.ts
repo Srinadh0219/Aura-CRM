@@ -1,12 +1,16 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateModuleDto, UpdateModuleDto } from './dto/module.dto';
+import { AuditService } from '../../audit/audit.service';
 
 @Injectable()
 export class ModulesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
-  async create(namespaceId: string, dto: CreateModuleDto) {
+  async create(namespaceId: string, dto: CreateModuleDto, user?: any) {
     const namespace = await this.prisma.namespace.findUnique({ where: { id: namespaceId } });
     if (!namespace) throw new NotFoundException(`Namespace ${namespaceId} not found`);
 
@@ -22,7 +26,7 @@ export class ModulesService {
       throw new ConflictException(`Module '${dto.handle}' already exists in this namespace`);
     }
 
-    return this.prisma.module.create({
+    const createdModule = await this.prisma.module.create({
       data: {
         namespaceId,
         name: dto.name,
@@ -34,6 +38,23 @@ export class ModulesService {
         _count: { select: { records: true } },
       },
     });
+
+    // Write Audit Log
+    await this.auditService.log({
+      userId: user?.id,
+      userName: user ? `${user.firstName} ${user.lastName}` : 'System',
+      userEmail: user?.email || 'system@auracrm.local',
+      action: 'CREATE_MODULE',
+      entityType: 'MODULE',
+      entityId: createdModule.id,
+      details: {
+        moduleName: createdModule.name,
+        moduleHandle: createdModule.handle,
+        namespaceName: namespace.name,
+      },
+    });
+
+    return createdModule;
   }
 
   async findAll(namespaceId: string) {
@@ -60,9 +81,9 @@ export class ModulesService {
     return mod;
   }
 
-  async update(moduleId: string, dto: UpdateModuleDto) {
+  async update(moduleId: string, dto: UpdateModuleDto, user?: any) {
     await this.findOne(moduleId);
-    return this.prisma.module.update({
+    const updated = await this.prisma.module.update({
       where: { id: moduleId },
       data: {
         name: dto.name,
@@ -73,10 +94,38 @@ export class ModulesService {
         fields: { orderBy: { order: 'asc' } },
       },
     });
+
+    await this.auditService.log({
+      userId: user?.id,
+      userName: user ? `${user.firstName} ${user.lastName}` : 'System',
+      userEmail: user?.email || 'system@auracrm.local',
+      action: 'UPDATE_MODULE',
+      entityType: 'MODULE',
+      entityId: moduleId,
+      details: {
+        moduleName: updated.name,
+      },
+    });
+
+    return updated;
   }
 
-  async remove(moduleId: string) {
-    await this.findOne(moduleId);
-    return this.prisma.module.delete({ where: { id: moduleId } });
+  async remove(moduleId: string, user?: any) {
+    const mod = await this.findOne(moduleId);
+    const deleted = await this.prisma.module.delete({ where: { id: moduleId } });
+
+    await this.auditService.log({
+      userId: user?.id,
+      userName: user ? `${user.firstName} ${user.lastName}` : 'System',
+      userEmail: user?.email || 'system@auracrm.local',
+      action: 'DELETE_MODULE',
+      entityType: 'MODULE',
+      entityId: moduleId,
+      details: {
+        moduleName: mod.name,
+      },
+    });
+
+    return deleted;
   }
 }

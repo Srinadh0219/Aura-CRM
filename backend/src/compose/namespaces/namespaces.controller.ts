@@ -5,6 +5,7 @@ import { CreateNamespaceDto, UpdateNamespaceDto } from './dto/namespace.dto';
 import { JwtAuthGuard, RolesGuard } from '../../auth/guards';
 import { Roles } from '../../auth/roles.decorator';
 import { RoleType } from '../../common/enums';
+import { CurrentUser } from '../../auth/current-user.decorator';
 
 @ApiTags('Compose: Namespaces')
 @Controller('compose/namespaces')
@@ -16,8 +17,11 @@ export class NamespacesController {
   @Post()
   @Roles(RoleType.SUPERADMIN, RoleType.ADMIN)
   @ApiOperation({ summary: 'Create a new application namespace' })
-  async create(@Body() dto: CreateNamespaceDto) {
-    return this.namespacesService.create(dto);
+  async create(
+    @Body() dto: CreateNamespaceDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.namespacesService.create(dto, user);
   }
 
   @Get()
@@ -35,14 +39,21 @@ export class NamespacesController {
   @Patch(':id')
   @Roles(RoleType.SUPERADMIN, RoleType.ADMIN)
   @ApiOperation({ summary: 'Update namespace details' })
-  async update(@Param('id') id: string, @Body() dto: UpdateNamespaceDto) {
-    return this.namespacesService.update(id, dto);
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateNamespaceDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.namespacesService.update(id, dto, user);
   }
 
   @Delete(':id')
   @Roles(RoleType.SUPERADMIN)
   @ApiOperation({ summary: 'Delete a namespace' })
-  async remove(@Param('id') id: string) {
-    return this.namespacesService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.namespacesService.remove(id, user);
   }
 }

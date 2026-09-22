@@ -4,10 +4,10 @@ import api from '../services/api';
 import { useAuth, User } from '../context/AuthContext';
 
 const ROLES = [
-  { value: 'SUPERADMIN', label: 'Superadmin', color: 'bg-purple-100 text-purple-700 border-purple-200' },
-  { value: 'ADMIN', label: 'Admin', color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
-  { value: 'MEMBER', label: 'Member', color: 'bg-sky-100 text-sky-700 border-sky-200' },
-  { value: 'VIEWER', label: 'Viewer', color: 'bg-slate-100 text-slate-700 border-slate-200' },
+  { value: 'SUPERADMIN', label: 'Superadmin', color: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
+  { value: 'ADMIN', label: 'Admin', color: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' },
+  { value: 'MEMBER', label: 'Member', color: 'bg-sky-500/15 text-sky-400 border-sky-500/30' },
+  { value: 'VIEWER', label: 'Viewer', color: 'bg-slate-800 text-slate-400 border-white/10' },
 ];
 
 export const UsersPage: React.FC = () => {
@@ -91,19 +91,19 @@ export const UsersPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
               <UsersIcon className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-800">User Management & RBAC</h1>
-              <p className="text-sm text-slate-500">Manage user accounts, roles, and access levels.</p>
+              <h1 className="text-2xl font-bold text-white tracking-tight">User Management & RBAC</h1>
+              <p className="text-xs text-slate-400 mt-0.5">Manage user accounts, role tiers, and access privileges.</p>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-xs px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 font-semibold flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4" />
+          <span className="text-xs px-3 py-1.5 rounded-xl bg-purple-500/15 text-purple-300 border border-purple-500/30 font-semibold flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-purple-400" />
             Superadmin Access Active
           </span>
         </div>
@@ -112,23 +112,23 @@ export const UsersPage: React.FC = () => {
       {/* Notification Message */}
       {message && (
         <div
-          className={`p-4 rounded-xl text-sm flex items-center gap-3 border ${
+          className={`p-3.5 rounded-xl text-xs flex items-center gap-3 border ${
             message.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              : 'bg-red-50 text-red-800 border-red-200'
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+              : 'bg-red-500/10 text-red-400 border-red-500/30'
           }`}
         >
           {message.type === 'success' ? (
-            <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
           ) : (
-            <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
           )}
           <span>{message.text}</span>
         </div>
       )}
 
       {/* Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-4">
+      <div className="bg-slate-900/90 p-4 rounded-2xl border border-white/10 shadow-xl flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
@@ -136,19 +136,19 @@ export const UsersPage: React.FC = () => {
             placeholder="Search by name, email, or role..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            className="w-full pl-10 pr-4 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition-all"
           />
         </div>
-        <div className="text-xs text-slate-500 font-semibold">
-          Total Users: <span className="text-slate-800">{users.length}</span>
+        <div className="text-xs text-slate-400 font-semibold font-mono">
+          Total Users: <span className="text-white font-bold">{users.length}</span>
         </div>
       </div>
 
       {/* Users Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-slate-900/90 border border-white/10 rounded-2xl shadow-xl overflow-hidden backdrop-blur-md">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+          <table className="w-full text-left text-xs text-slate-300">
+            <thead className="bg-slate-950/80 text-slate-400 font-mono text-[11px] uppercase border-b border-white/10">
               <tr>
                 <th className="p-4">User</th>
                 <th className="p-4">Email Address</th>
@@ -158,7 +158,7 @@ export const UsersPage: React.FC = () => {
                 {isSuperadmin && <th className="p-4 text-right">Change Role</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-white/5">
               {loading ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-slate-400">
@@ -177,36 +177,36 @@ export const UsersPage: React.FC = () => {
                   const roleConfig = ROLES.find((r) => r.value === u.role) || ROLES[2];
 
                   return (
-                    <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={u.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-md shadow-sky-500/20">
                             {u.firstName?.[0]}
                             {u.lastName?.[0]}
                           </div>
                           <div>
-                            <div className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                            <div className="font-semibold text-white text-sm flex items-center gap-1.5">
                               <span>
                                 {u.firstName} {u.lastName}
                               </span>
                               {isSelf && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-400 font-mono border border-sky-500/20">
                                   You
                                 </span>
                               )}
                             </div>
-                            <div className="text-slate-400 text-[11px]">ID: {u.id.slice(0, 8)}...</div>
+                            <div className="text-slate-500 text-[11px] font-mono">ID: {u.id.slice(0, 8)}...</div>
                           </div>
                         </div>
                       </td>
 
-                      <td className="p-4 font-mono text-slate-600 text-xs">{u.email}</td>
+                      <td className="p-4 font-mono text-slate-300 text-xs">{u.email}</td>
 
                       <td className="p-4">
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${roleConfig.color}`}
                         >
-                          <Shield className="w-3.5 h-3.5" />
+                          <Shield className="w-3 h-3" />
                           {roleConfig.label}
                         </span>
                       </td>
@@ -215,28 +215,28 @@ export const UsersPage: React.FC = () => {
                         <button
                           onClick={() => !isSelf && handleStatusToggle(u.id, u.isActive)}
                           disabled={isSelf || !isSuperadmin}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
                             u.isActive
-                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                              : 'bg-red-50 text-red-700 hover:bg-red-100'
+                              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                              : 'bg-red-500/15 text-red-400 border-red-500/30 hover:bg-red-500/25'
                           } ${isSelf ? 'cursor-default' : 'cursor-pointer'}`}
                           title={isSelf ? 'Cannot deactivate your own account' : 'Click to toggle status'}
                         >
                           {u.isActive ? (
                             <>
-                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                               Active
                             </>
                           ) : (
                             <>
-                              <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
                               Inactive
                             </>
                           )}
                         </button>
                       </td>
 
-                      <td className="p-4 text-slate-500">
+                      <td className="p-4 text-slate-400 font-mono">
                         {new Date(u.createdAt).toLocaleDateString(undefined, {
                           year: 'numeric',
                           month: 'short',
@@ -250,10 +250,10 @@ export const UsersPage: React.FC = () => {
                             disabled={updatingId === u.id || isSelf}
                             value={u.role}
                             onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                            className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 disabled:opacity-50 cursor-pointer shadow-sm"
+                            className="px-3 py-1.5 border border-white/10 rounded-xl text-xs bg-slate-950 focus:outline-none focus:border-indigo-500 font-medium text-slate-200 disabled:opacity-50 cursor-pointer shadow-sm"
                           >
                             {ROLES.map((r) => (
-                              <option key={r.value} value={r.value}>
+                              <option key={r.value} value={r.value} className="bg-slate-900 text-white">
                                 Change to {r.label}
                               </option>
                             ))}

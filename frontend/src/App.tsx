@@ -11,6 +11,8 @@ import { ModulesPage } from './pages/ModulesPage';
 import { RecordsPage } from './pages/RecordsPage';
 import { UsersPage } from './pages/UsersPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
+import { AutomationsPage } from './pages/AutomationsPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { token, isLoading } = useAuth();
@@ -57,6 +59,8 @@ export const App: React.FC = () => {
               path="/namespaces/:namespaceId/modules/:moduleId/records"
               element={<RecordsPage />}
             />
+            <Route path="/automations" element={<AutomationsPage />} />
+            <Route path="/audit-logs" element={<AuditLogsPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>

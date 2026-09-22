@@ -1,7 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Plus, ArrowLeft, Search, Edit2, Trash2, X, FileText, CheckCircle } from 'lucide-react';
+import {
+  Plus,
+  ArrowLeft,
+  Search,
+  Edit2,
+  Trash2,
+  X,
+  FileText,
+  CheckCircle,
+  Download,
+  Upload,
+  History,
+  Clock,
+  Sparkles,
+  Filter,
+} from 'lucide-react';
 import api from '../services/api';
+import { CsvImportModal } from '../components/CsvImportModal';
 
 export const RecordsPage: React.FC = () => {
   const { namespaceId, moduleId } = useParams<{ namespaceId: string; moduleId: string }>();
@@ -11,18 +27,24 @@ export const RecordsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Record Form Modal (Create & Edit)
+  // Modals
   const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Record Audit History Drawer
+  const [historyRecordId, setHistoryRecordId] = useState<string | null>(null);
+  const [recordLogs, setRecordLogs] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const fetchRecords = async (query = '') => {
     if (!moduleId) return;
     try {
       const res = await api.get(`/compose/modules/${moduleId}/records`, {
-        params: { query, page: 1, limit: 50 },
+        params: { query, page: 1, limit: 100 },
       });
       setRecords(res.data.data);
       setMeta(res.data.meta);
@@ -98,6 +120,47 @@ export const RecordsPage: React.FC = () => {
     }
   };
 
+  // CSV Export Engine
+  const handleExportCsv = () => {
+    if (!records.length || !moduleData?.fields) return;
+
+    const fields = moduleData.fields;
+    const headerRow = fields.map((f: any) => `"${f.label || f.name}"`).join(',');
+
+    const rows = records.map((r: any) => {
+      return fields
+        .map((f: any) => {
+          const val = r.values?.[f.name];
+          if (val === undefined || val === null) return '""';
+          return `"${String(val).replace(/"/g, '""')}"`;
+        })
+        .join(',');
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headerRow, ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `${moduleData.handle || 'crm'}_records_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Fetch record audit history
+  const openHistoryDrawer = async (recordId: string) => {
+    setHistoryRecordId(recordId);
+    setLoadingHistory(true);
+    try {
+      const res = await api.get(`/audit/entity/RECORD/${recordId}`);
+      setRecordLogs(res.data);
+    } catch (err) {
+      console.error('Failed to load record history', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const fields = moduleData?.fields || [];
 
   return (
@@ -107,42 +170,66 @@ export const RecordsPage: React.FC = () => {
         <div className="flex items-center gap-4">
           <Link
             to={`/namespaces/${namespaceId}/modules`}
-            className="p-2 bg-white rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shadow-sm"
+            className="p-2.5 bg-slate-900 rounded-xl border border-white/10 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shadow-sm"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-slate-800">{moduleData?.name || 'Records'}</h1>
-              <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+              <h1 className="text-2xl font-bold text-white tracking-tight">
+                {moduleData?.name || 'Records'}
+              </h1>
+              <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">
                 {moduleData?.handle}
               </span>
             </div>
-            <p className="text-sm text-slate-500">
-              Total {meta.total} records • Dynamic Low-Code Table View
+            <p className="text-xs text-slate-400 mt-0.5">
+              Total {meta.total} records • Dynamic Type-Safe JSONB Engine
             </p>
           </div>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl text-sm shadow-md transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New {moduleData?.name || 'Record'}
-        </button>
+        {/* Action Buttons: Import, Export, New Record */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleExportCsv}
+            disabled={records.length === 0}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white font-semibold rounded-xl text-xs shadow-sm transition-all disabled:opacity-40 cursor-pointer"
+            title="Download records as CSV"
+          >
+            <Download className="w-3.5 h-3.5 text-sky-400" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white font-semibold rounded-xl text-xs shadow-sm transition-all cursor-pointer"
+            title="Import records from CSV"
+          >
+            <Upload className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Import CSV</span>
+          </button>
+
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-sky-500/20 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New {moduleData?.name || 'Record'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-4">
+      <div className="bg-slate-900/90 p-3 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between gap-4">
         <form onSubmit={handleSearch} className="flex-1 max-w-md relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search records..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            placeholder="Search across all fields..."
+            className="w-full pl-10 pr-4 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
           />
         </form>
         {searchQuery && (
@@ -151,206 +238,241 @@ export const RecordsPage: React.FC = () => {
               setSearchQuery('');
               fetchRecords('');
             }}
-            className="text-xs text-slate-500 hover:text-slate-700 font-semibold"
+            className="text-xs text-sky-400 hover:underline px-2"
           >
-            Clear Search
+            Clear
           </button>
         )}
       </div>
 
-      {/* Dynamic Data Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-              <tr>
-                <th className="p-3.5">#</th>
-                {fields.map((f: any) => (
-                  <th key={f.id} className="p-3.5">
-                    {f.label}
-                  </th>
-                ))}
-                <th className="p-3.5">Created By</th>
-                <th className="p-3.5">Created At</th>
-                <th className="p-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {loading ? (
+      {/* Records Table */}
+      <div className="bg-slate-900/90 rounded-2xl border border-white/10 shadow-xl overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center text-xs text-slate-400">Loading records...</div>
+        ) : records.length === 0 ? (
+          <div className="p-12 text-center space-y-3">
+            <FileText className="w-10 h-10 text-slate-600 mx-auto" />
+            <div className="text-sm font-semibold text-white">No records found</div>
+            <p className="text-xs text-slate-400">
+              Create your first record manually or import a batch via CSV.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-slate-950/80 text-slate-400 font-mono text-[11px] uppercase border-b border-white/10">
                 <tr>
-                  <td colSpan={fields.length + 4} className="p-8 text-center text-slate-400">
-                    Loading records...
-                  </td>
+                  <th className="px-5 py-3">#</th>
+                  {fields.map((f: any) => (
+                    <th key={f.id} className="px-5 py-3 font-semibold">
+                      {f.label}
+                    </th>
+                  ))}
+                  <th className="px-5 py-3">Created By</th>
+                  <th className="px-5 py-3">Created At</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
-              ) : records.length === 0 ? (
-                <tr>
-                  <td colSpan={fields.length + 4} className="p-12 text-center text-slate-400">
-                    <FileText className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                    No records found. Click "New {moduleData?.name || 'Record'}" to add your first record.
-                  </td>
-                </tr>
-              ) : (
-                records.map((rec: any, idx: number) => (
-                  <tr key={rec.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-3.5 text-slate-400 font-mono">{idx + 1}</td>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {records.map((r, idx) => (
+                  <tr key={r.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="px-5 py-3 font-mono text-slate-500">{idx + 1}</td>
                     {fields.map((f: any) => {
-                      const val = rec.values ? rec.values[f.name] : null;
+                      const val = r.values?.[f.name];
                       return (
-                        <td key={f.id} className="p-3.5 font-medium text-slate-800 max-w-xs truncate">
-                          {f.kind === 'Boolean' ? (
-                            val ? (
-                              <span className="text-emerald-600 font-bold">Yes</span>
-                            ) : (
-                              <span className="text-slate-400">No</span>
-                            )
-                          ) : f.kind === 'Number' && typeof val === 'number' ? (
-                            val.toLocaleString()
-                          ) : val !== null && val !== undefined ? (
-                            String(val)
-                          ) : (
-                            <span className="text-slate-300 italic">—</span>
-                          )}
+                        <td key={f.id} className="px-5 py-3 font-medium text-white max-w-[200px] truncate">
+                          {val !== undefined && val !== null ? String(val) : '—'}
                         </td>
                       );
                     })}
-                    <td className="p-3.5 text-slate-600">
-                      {rec.createdBy ? `${rec.createdBy.firstName} ${rec.createdBy.lastName}` : 'System'}
+                    <td className="px-5 py-3 text-slate-400 font-mono">
+                      {r.createdBy ? `${r.createdBy.firstName} ${r.createdBy.lastName}` : 'System'}
                     </td>
-                    <td className="p-3.5 text-slate-400">
-                      {new Date(rec.createdAt).toLocaleDateString()}
+                    <td className="px-5 py-3 text-slate-500 font-mono">
+                      {new Date(r.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="p-3.5 text-right space-x-2">
-                      <button
-                        onClick={() => openEditModal(rec)}
-                        className="p-1 text-slate-500 hover:text-sky-600 rounded transition-colors"
-                        title="Edit Record"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteRecord(rec.id)}
-                        className="p-1 text-slate-500 hover:text-red-600 rounded transition-colors"
-                        title="Delete Record"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <td className="px-5 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openHistoryDrawer(r.id)}
+                          title="View audit history"
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-purple-500/20 text-slate-400 hover:text-purple-300 border border-white/5 transition-colors"
+                        >
+                          <History className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => openEditModal(r)}
+                          title="Edit record"
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-sky-500/20 text-slate-400 hover:text-sky-300 border border-white/5 transition-colors"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecord(r.id)}
+                          title="Delete record"
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-slate-400 hover:text-red-300 border border-white/5 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Dynamic Form Modal (Create / Edit) */}
+      {/* Record Create / Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-800">
-                {editingRecord ? `Edit ${moduleData?.name}` : `New ${moduleData?.name}`}
-              </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  {editingRecord ? `Edit ${moduleData?.name}` : `New ${moduleData?.name}`}
+                </h2>
+                <p className="text-xs text-slate-400">Fill in the dynamic module fields</p>
+              </div>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {formError && (
-              <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-xs font-medium">
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
                 {formError}
               </div>
             )}
 
             <form onSubmit={handleSaveRecord} className="space-y-4">
-              {fields.length === 0 ? (
-                <p className="text-sm text-slate-500 italic p-4 text-center">
-                  This module has no fields configured yet. Please configure fields in the module settings first.
-                </p>
-              ) : (
-                fields.map((f: any) => {
-                  const currentValue = formData[f.name] ?? '';
+              {fields.map((field: any) => (
+                <div key={field.id}>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    {field.label}{' '}
+                    {field.isRequired && <span className="text-red-400">*</span>}
+                  </label>
+                  {field.kind === 'Select' && field.options ? (
+                    <select
+                      value={formData[field.name] || ''}
+                      onChange={(e) => handleInputChange(field.name, e.target.value)}
+                      required={field.isRequired}
+                      className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-white/10 text-xs text-white focus:outline-none focus:border-sky-500"
+                    >
+                      <option value="">-- Select --</option>
+                      {(Array.isArray(field.options) ? field.options : []).map((opt: string) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={field.kind === 'Number' ? 'number' : field.kind === 'DateTime' ? 'date' : 'text'}
+                      value={formData[field.name] || ''}
+                      onChange={(e) => handleInputChange(field.name, e.target.value)}
+                      required={field.isRequired}
+                      className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-white/10 text-xs text-white focus:outline-none focus:border-sky-500"
+                    />
+                  )}
+                </div>
+              ))}
 
-                  return (
-                    <div key={f.id}>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        {f.label} {f.isRequired && <span className="text-red-500">*</span>}
-                      </label>
-
-                      {f.kind === 'Select' ? (
-                        <select
-                          required={f.isRequired}
-                          value={currentValue}
-                          onChange={(e) => handleInputChange(f.name, e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                        >
-                          <option value="">-- Select an option --</option>
-                          {(f.options?.options || []).map((opt: string) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      ) : f.kind === 'Boolean' ? (
-                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-1">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(formData[f.name])}
-                            onChange={(e) => handleInputChange(f.name, e.target.checked)}
-                            className="rounded border-slate-300 text-sky-600 w-4 h-4"
-                          />
-                          <span>Yes</span>
-                        </label>
-                      ) : f.kind === 'Number' ? (
-                        <input
-                          type="number"
-                          step="any"
-                          required={f.isRequired}
-                          value={currentValue}
-                          onChange={(e) => handleInputChange(f.name, e.target.value)}
-                          placeholder="0"
-                          className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                        />
-                      ) : f.kind === 'DateTime' ? (
-                        <input
-                          type="datetime-local"
-                          required={f.isRequired}
-                          value={currentValue ? currentValue.slice(0, 16) : ''}
-                          onChange={(e) => handleInputChange(f.name, e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                        />
-                      ) : (
-                        <input
-                          type={f.kind === 'Email' ? 'email' : 'text'}
-                          required={f.isRequired}
-                          value={currentValue}
-                          onChange={(e) => handleInputChange(f.name, e.target.value)}
-                          placeholder={`Enter ${f.label.toLowerCase()}...`}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                        />
-                      )}
-                    </div>
-                  );
-                })
-              )}
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="pt-4 border-t border-white/10 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
+                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting || fields.length === 0}
-                  className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl text-sm shadow disabled:opacity-50"
+                  disabled={submitting}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold text-xs shadow-lg shadow-sky-500/20 disabled:opacity-50 cursor-pointer"
                 >
-                  {submitting ? 'Saving...' : editingRecord ? 'Update Record' : 'Create Record'}
+                  {submitting ? 'Saving...' : 'Save Record'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Import Modal */}
+      <CsvImportModal
+        moduleId={moduleId!}
+        fields={fields}
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => fetchRecords(searchQuery)}
+      />
+
+      {/* Record Audit History Drawer */}
+      {historyRecordId && (
+        <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md bg-slate-900 border-l border-white/10 p-6 shadow-2xl flex flex-col justify-between overflow-hidden">
+            <div>
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
+                    <History className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Record Audit Timeline</h3>
+                    <p className="text-xs text-slate-400 font-mono">ID: {historyRecordId.slice(0, 12)}...</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setHistoryRecordId(null)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {loadingHistory ? (
+                <div className="p-8 text-center text-xs text-slate-400">Loading history...</div>
+              ) : recordLogs.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500">No audit events recorded for this record.</div>
+              ) : (
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+                  {recordLogs.map((log) => (
+                    <div key={log.id} className="p-3.5 rounded-xl bg-slate-950/80 border border-white/5 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-white">{log.userName}</span>
+                        <span className="text-[10px] font-mono text-slate-500">
+                          {new Date(log.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-purple-400 font-mono font-semibold uppercase">
+                        {log.action}
+                      </div>
+
+                      {log.details?.diff && (
+                        <div className="mt-2 pt-2 border-t border-white/5 text-[11px] font-mono space-y-1">
+                          {Object.entries(log.details.diff).map(([k, change]: [string, any]) => (
+                            <div key={k} className="text-slate-300">
+                              <span className="text-slate-400">{k}:</span>{' '}
+                              <span className="text-red-400 line-through">{String(change.from || 'null')}</span> →{' '}
+                              <span className="text-emerald-400 font-bold">{String(change.to)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setHistoryRecordId(null)}
+              className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-slate-300 mt-4"
+            >
+              Close History
+            </button>
           </div>
         </div>
       )}

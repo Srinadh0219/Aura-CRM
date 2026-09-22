@@ -5,6 +5,7 @@ import { CreateModuleDto, UpdateModuleDto } from './dto/module.dto';
 import { JwtAuthGuard, RolesGuard } from '../../auth/guards';
 import { Roles } from '../../auth/roles.decorator';
 import { RoleType } from '../../common/enums';
+import { CurrentUser } from '../../auth/current-user.decorator';
 
 @ApiTags('Compose: Modules')
 @Controller('compose/namespaces/:namespaceId/modules')
@@ -19,8 +20,9 @@ export class ModulesController {
   async create(
     @Param('namespaceId') namespaceId: string,
     @Body() dto: CreateModuleDto,
+    @CurrentUser() user: any,
   ) {
-    return this.modulesService.create(namespaceId, dto);
+    return this.modulesService.create(namespaceId, dto, user);
   }
 
   @Get()
@@ -41,14 +43,18 @@ export class ModulesController {
   async update(
     @Param('moduleId') moduleId: string,
     @Body() dto: UpdateModuleDto,
+    @CurrentUser() user: any,
   ) {
-    return this.modulesService.update(moduleId, dto);
+    return this.modulesService.update(moduleId, dto, user);
   }
 
   @Delete(':moduleId')
   @Roles(RoleType.SUPERADMIN, RoleType.ADMIN)
   @ApiOperation({ summary: 'Delete a module' })
-  async remove(@Param('moduleId') moduleId: string) {
-    return this.modulesService.remove(moduleId);
+  async remove(
+    @Param('moduleId') moduleId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.modulesService.remove(moduleId, user);
   }
 }
